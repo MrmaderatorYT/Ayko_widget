@@ -1,6 +1,7 @@
 package com.ccs.ayko;
 
 import android.animation.ObjectAnimator;
+import android.annotation.SuppressLint;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -25,6 +26,9 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.Target;
+
 import java.util.Calendar;
 import java.util.Random;
 
@@ -40,10 +44,13 @@ public class FloatingService extends Service {
     private Vibrator vibrator;
     private static final long INACTIVITY_DELAY = 10 * 60 * 1000; // 10 хвилин у мілісекундах
 
-
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Ініціалізація Vibrator
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         // Перевірка дозволу на відображення поверх інших програм
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -88,6 +95,13 @@ public class FloatingService extends Service {
 
         // Отримання зображення дівчинки
         girlImage = floatingView.findViewById(R.id.girl_image);
+
+        // Завантаження GIF за допомогою Glide
+        Glide.with(this)
+                .asGif() // Вказуємо, що це GIF
+                .load(R.drawable.girl_image) // Замініть на ваш GIF файл
+                .override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL) // Оригінальний розмір
+                .into(girlImage);
 
         // Обробник переміщення зображення
         girlImage.setOnTouchListener(new View.OnTouchListener() {
@@ -148,6 +162,7 @@ public class FloatingService extends Service {
             }
         }, 60000); // 60000 мілісекунд = 1 хвилина
     }
+
     private void startInactivityCheck() {
         inactivityHandler.postDelayed(new Runnable() {
             @Override
