@@ -269,4 +269,12 @@ public class FloatingService extends Service {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
     }
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.hasExtra("message")) {
+            String message = intent.getStringExtra("message");
+            showNotification(message);
+        }
+        return START_STICKY;
+    }
 }
