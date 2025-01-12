@@ -7,14 +7,20 @@ import android.util.Log;
 
 public class NotificationListener extends NotificationListenerService {
 
+    private static final String TAG = "NotificationListener";
+
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         String packageName = sbn.getPackageName(); // Отримуємо ім'я пакета додатка
         String notificationText = sbn.getNotification().tickerText != null ? sbn.getNotification().tickerText.toString() : "";
 
+        Log.d(TAG, "Notification received from: " + packageName);
+        Log.d(TAG, "Notification text: " + notificationText);
+
         // Перевіряємо, чи це повідомлення з месенджера
         if (packageName.contains("whatsapp") || packageName.contains("telegram") || packageName.contains("messenger")) {
             String message = "Хто це тобі пише? Мені не подобається...";
+            Log.d(TAG, "Triggering reaction for message: " + message);
             showReaction(message);
         }
     }

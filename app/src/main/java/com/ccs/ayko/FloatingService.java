@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -34,6 +35,8 @@ import java.util.Random;
 
 public class FloatingService extends Service {
 
+    private static final String TAG = "FloatingService";
+
     private WindowManager windowManager;
     private View floatingView;
     private WindowManager.LayoutParams params;
@@ -48,6 +51,7 @@ public class FloatingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "FloatingService created");
 
         // Ініціалізація Vibrator
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
@@ -55,6 +59,7 @@ public class FloatingService extends Service {
         // Перевірка дозволу на відображення поверх інших програм
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
+                Log.d(TAG, "Overlay permission not granted, stopping service");
                 stopSelf();
                 return;
             }
@@ -92,6 +97,7 @@ public class FloatingService extends Service {
 
         // Додавання вікна до WindowManager
         windowManager.addView(floatingView, params);
+        Log.d(TAG, "Floating view added to window manager");
 
         // Отримання зображення дівчинки
         girlImage = floatingView.findViewById(R.id.girl_image);
@@ -233,6 +239,7 @@ public class FloatingService extends Service {
 
         // Показ сповіщення
         notificationManager.notify(1, builder.build());
+        Log.d(TAG, "Notification shown: " + message);
     }
 
     private String getTimeOfDay() {
@@ -255,6 +262,7 @@ public class FloatingService extends Service {
         super.onDestroy();
         if (floatingView != null) {
             windowManager.removeView(floatingView); // Видалення вікна при завершенні сервісу
+            Log.d(TAG, "Floating view removed from window manager");
         }
     }
 
@@ -269,10 +277,12 @@ public class FloatingService extends Service {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
     }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra("message")) {
             String message = intent.getStringExtra("message");
+            Log.d(TAG, "Received message from NotificationListener: " + message);
             showNotification(message);
         }
         return START_STICKY;
