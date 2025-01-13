@@ -6,7 +6,12 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
@@ -22,7 +27,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
-import android.content.Context;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -30,7 +34,9 @@ import androidx.core.app.NotificationCompat;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.Target;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Random;
 
 public class FloatingService extends Service {
@@ -45,7 +51,7 @@ public class FloatingService extends Service {
     private Random random = new Random();
     private Handler inactivityHandler = new Handler(Looper.getMainLooper());
     private Vibrator vibrator;
-    private static final long INACTIVITY_DELAY = 10 * 60 * 1000; // 10 хвилин у мілісекундах
+    private static final long INACTIVITY_DELAY = 60 * 1000; // 1 хвилина у мілісекундах
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -160,26 +166,24 @@ public class FloatingService extends Service {
             }
         });
 
-        // Випадкові події через певний час
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                randomEvent();
-            }
-        }, 60000); // 60000 мілісекунд = 1 хвилина
+        // Перевірка на неактивність
+        startInactivityCheck();
     }
 
     private void startInactivityCheck() {
+        Log.d(TAG, "Starting inactivity check with delay: " + INACTIVITY_DELAY + " ms");
         inactivityHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                // Якщо користувач не взаємодіє з віджетом протягом 10 хвилин
+                Log.d(TAG, "Inactivity detected, triggering actions");
                 triggerVibration();
+                makeGirlDisappearAndReappear(); // Дівчинка "никає"
             }
         }, INACTIVITY_DELAY);
     }
 
     private void triggerVibration() {
+        Log.d(TAG, "Triggering vibration");
         if (vibrator != null && vibrator.hasVibrator()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // Вібрація для Android 8.0 і вище
@@ -212,6 +216,7 @@ public class FloatingService extends Service {
     }
 
     private void showNotification(String message) {
+        Log.d(TAG, "Showing notification: " + message);
         String channelId = "yanchan_channel";
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -273,6 +278,11 @@ public class FloatingService extends Service {
     }
 
     private void showAlertDialog() {
+        // Скидання лічильника прив'язаності
+        affectionLevel = 0;
+        Log.d(TAG, "Affection level reset to 0");
+
+        // Запуск активності діалогу
         Intent intent = new Intent(this, DialogActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
@@ -286,5 +296,97 @@ public class FloatingService extends Service {
             showNotification(message);
         }
         return START_STICKY;
+    }
+
+    // Нова функція: дівчинка "никає" (зникає та з'являється)
+    private void makeGirlDisappearAndReappear() {
+        Log.d(TAG, "Making girl disappear and reappear");
+
+        // Отримання списку встановлених програм (виключаючи поточну активну програму та системні)
+        List<String> installedPackages = getInstalledPackagesExcludingCurrentAndSystem();
+        if (installedPackages.isEmpty()) {
+            Log.d(TAG, "No installed packages found (excluding current app and system apps)");
+            return;
+        }
+
+        // Випадковий вибір програми
+        String randomPackage = installedPackages.get(random.nextInt(installedPackages.size()));
+        Log.d(TAG, "Random package selected: " + randomPackage);
+
+        // Отримання назви програми
+        String appName = getAppNameFromPackage(randomPackage);
+        Log.d(TAG, "App name: " + appName);
+
+        // Анімація зникнення
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(girlImage, "alpha", 1f, 0f);
+        fadeOut.setDuration(500); // 500 мілісекунд
+        fadeOut.start();
+
+        // Затримка перед повторним з'явленням
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Переміщення дівчинки в нове випадкове місце
+                params.x = random.nextInt(1000); // Випадкова позиція по X
+                params.y = random.nextInt(1000); // Випадкова позиція по Y
+                windowManager.updateViewLayout(floatingView, params);
+
+                // Анімація з'явлення
+                ObjectAnimator fadeIn = ObjectAnimator.ofFloat(girlImage, "alpha", 0f, 1f);
+                fadeIn.setDuration(500); // 500 мілісекунд
+                fadeIn.start();
+
+                // Показ сповіщення
+                showNotification("Я заховалася в програмі: " + appName);
+            }
+        }, 1000); // Затримка 1 секунда
+    }
+
+    @SuppressLint("NewApi")
+    private String getCurrentAppPackageName() {
+        String currentApp = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            UsageStatsManager usageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
+            long time = System.currentTimeMillis();
+            List<UsageStats> stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * 1000, time);
+            if (stats != null) {
+                UsageStats recentStats = null;
+                for (UsageStats usageStats : stats) {
+                    if (recentStats == null || usageStats.getLastTimeUsed() > recentStats.getLastTimeUsed()) {
+                        recentStats = usageStats;
+                    }
+                }
+                if (recentStats != null) {
+                    currentApp = recentStats.getPackageName();
+                }
+            }
+        }
+        return currentApp;
+    }
+
+    private List<String> getInstalledPackagesExcludingCurrentAndSystem() {
+        List<String> packages = new ArrayList<>();
+        String currentApp = getCurrentAppPackageName(); // Поточна активна програма
+        PackageManager packageManager = getPackageManager();
+        List<ApplicationInfo> apps = packageManager.getInstalledApplications(0);
+
+        for (ApplicationInfo appInfo : apps) {
+            // Виключаємо системні програми, оновлені системні програми, поточну активну програму та програму "com.ccs.ayko"
+            if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0 &&
+                    (appInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0 &&
+                    !appInfo.packageName.equals(currentApp) &&
+                    !appInfo.packageName.equals("com.ccs.ayko")) {
+                packages.add(appInfo.packageName);
+            }
+        }
+        return packages;
+    }
+
+    private String getAppNameFromPackage(String packageName) {
+        try {
+            return getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(packageName, 0)).toString();
+        } catch (Exception e) {
+            return "Unknown App";
+        }
     }
 }
